@@ -60,7 +60,7 @@ code{background:var(--bg);padding:1px 6px;border-radius:6px;font-size:14px;word-
 /* Telefoonpagina voor de golfboeker. Praat rechtstreeks met de privé-repo op GitHub (instellingen lezen en bewaren, proefrun en boeken starten).
    Er staat niets geheims in dit bestand: de GitHub-sleutel staat alleen op de telefoon van wie hem invult. */
 const REPO = 'kscdbgt5d6-cloud/Prive', API = 'https://api.github.com', TAAK = { w: 'woensdag', z: 'golf' };
-const BESTAND = { woensdag: 'golf/woensdag.json', zondag: 'golf/instellingen.json', statusW: 'golf/status-woensdag.json', statusZ: 'golf/status.json', proefW: 'golf/laatste-proef-woensdag.json', proefZ: 'golf/laatste-proef.json' };
+const BESTAND = { woensdag: 'golf/woensdag.json', zondag: 'golf/instellingen.json', statusW: 'golf/status-woensdag.json', statusZ: 'golf/status.json', proefW: 'golf/laatste-proef-woensdag.json', proefZ: 'golf/laatste-proef.json', aanpassing: 'golf/laatste-aanpassing-woensdag.json' };
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const bewaarLees = k => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -78,6 +78,13 @@ function roosterVoor(lijst, datum, start, aantal) { const n = lijst.length; if (
 function planVoor(lijst, datum, start, aantal) {
   const r = roosterVoor(lijst, datum, start, aantal), bookers = r.slice(0, aantal), verboden = new Set(bookers.map(b => b.naam.toLowerCase()));
   return bookers.map(booker => { const partner = [...r].reverse().find(p => !verboden.has(p.naam.toLowerCase())); if (partner) verboden.add(partner.naam.toLowerCase()); return { booker, partner }; });
+}
+const volgendeWoensdag = () => { const v = dagnr(vandaagNl()); for (let n = v; ; n++) if (mod(n + 4, 7) === 3) return datumVan(n); };
+/** Wie er volgens de boekingen speelt: de hoofdboekers en hun medespelers. Een goed beginpunt om de poll mee te vergelijken. */
+function standaardKomen(datum) {
+  const st = S.data.statusW || {}, uit = new Set();
+  for (const [k, e] of Object.entries(st)) if (k.startsWith(datum + '|') && !k.endsWith('|#') && ['geboekt', 'bestaat', 'onzeker'].includes(e.status)) { uit.add(k.split('|')[1]); if (e.maat) uit.add(e.maat); }
+  return uit;
 }
 function komendeWoensdagen(vandaag, aantal) { const v = dagnr(vandaag), uit = []; for (let n = v; uit.length < aantal; n++) if (mod(n + 4, 7) === 3) uit.push(datumVan(n)); return uit; }
 
@@ -104,8 +111,8 @@ async function schrijfJson(pad, json, sha, bericht) { const j = await gh(`/repos
 
 async function laadAlles() {
   await gh(`/repos/${REPO}`);   // eerst kijken of de sleutel werkt en bij de repo mag
-  const [w, z, sw, sz, pw, pz] = await Promise.all(['woensdag', 'zondag', 'statusW', 'statusZ', 'proefW', 'proefZ'].map(k => leesJson(BESTAND[k])));
-  S.data = { verbonden: true, woensdag: w, zondag: z, statusW: sw?.json || {}, statusZ: sz?.json || {}, proefW: pw?.json || null, proefZ: pz?.json || null };
+  const [w, z, sw, sz, pw, pz, aa] = await Promise.all(['woensdag', 'zondag', 'statusW', 'statusZ', 'proefW', 'proefZ', 'aanpassing'].map(k => leesJson(BESTAND[k])));
+  S.data = { verbonden: true, woensdag: w, zondag: z, statusW: sw?.json || {}, statusZ: sz?.json || {}, proefW: pw?.json || null, proefZ: pz?.json || null, aanpassing: aa?.json || null };
   S.wijz = {};
   S.lijst = (w?.json?.lijst || []).map(p => ({ ...p }));
 }
@@ -115,7 +122,7 @@ const melding = (soort, tekst) => { S.melding = tekst ? { soort, tekst } : null;
 /** Een melding vlak bij de knop (zonder de pagina opnieuw op te bouwen, zodat wat je intikte blijft staan) */
 const inline = (id, soort, tekst) => { const el = $(id); if (el) el.innerHTML = tekst ? `<div class="melding ${soort}" role="status">${esc(tekst)}</div>` : ''; };
 function schakel(id, aan, tekst, hulp) { return `<div class="schakel"><div><b>${esc(tekst)}</b>${hulp ? `<div class="zacht klein">${esc(hulp)}</div>` : ''}</div><button class="sw" id="${id}" role="switch" aria-checked="${aan ? 'true' : 'false'}" aria-label="${esc(tekst)}"></button></div>`; }
-const STATUS = { geboekt: ['✅', 'ok'], bestaat: ['✅ had al een boeking', 'ok'], wacht: ['⏳', 'let'], bezig: ['⏳', 'let'], onzeker: ['⚠️ kijk zelf in de golfapp', 'fout'] };
+const STATUS = { vervallen: ['samengevoegd', 'let'], geboekt: ['✅', 'ok'], bestaat: ['✅ had al een boeking', 'ok'], wacht: ['⏳', 'let'], bezig: ['⏳', 'let'], onzeker: ['⚠️ kijk zelf in de golfapp', 'fout'] };
 function proefBlok(p) {
   if (!p) return '<p class="zacht klein">Nog geen proefrun gedaan.</p>';
   const t = new Intl.DateTimeFormat('nl-NL', { timeZone: 'Europe/Amsterdam', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(p.tijd));
@@ -124,7 +131,29 @@ function proefBlok(p) {
 }
 function knoppenBlok(soort) {
   const bezig = S.bezig;
-  return `<div class="rij"><button class="vol" id="proef-${soort}" ${bezig ? 'disabled' : ''}>🔍 Proefrun<br><span class="klein zacht">boekt niets</span></button><button class="vol p" id="nu-${soort}" ${bezig ? 'disabled' : ''}>Nu boeken<br><span class="klein">echt boeken</span></button></div>${bezig ? `<div class="melding let" id="voortgang">${esc(bezig)}</div>` : ''}`;
+  return `<div class="rij"><button class="vol" id="proef-${soort}" ${bezig ? 'disabled' : ''}>🔍 Proefrun<br><span class="klein zacht">boekt niets</span></button><button class="vol p" id="nu-${soort}" ${bezig ? 'disabled' : ''}>Nu boeken<br><span class="klein">echt boeken</span></button></div>${bezig ? `<div class="melding let voortgang" id="voortgang">${esc(bezig)}</div>` : ''}`;
+}
+function aanpassingBlok(datum) {
+  const a = S.data.aanpassing, bezig = S.bezig;
+  if (!a || a.datum !== datum) return '';
+  const gelijk = [...S.komen].map(x => x.toLowerCase()).sort().join(';') === (a.komen || []).map(x => x.toLowerCase()).sort().join(';');
+  const t = new Intl.DateTimeFormat('nl-NL', { timeZone: 'Europe/Amsterdam', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(a.tijd));
+  const lijst = k => (k || []).length ? `<ul class="lijst klein">${k.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : '';
+  const uitgevoerd = a.modus === 'uitvoeren';
+  const kop = uitgevoerd ? (a.ok ? 'Aangepast bij de golfclub.' : 'Het aanpassen is niet (helemaal) gelukt.') : (a.ok ? 'Voorstel: dit gaat er gebeuren als je op Uitvoeren tikt.' : 'Er is nog geen voorstel mogelijk.');
+  return `<div class="melding ${a.ok ? 'ok' : 'fout'}" id="aanpassing-kop"><b>${esc(kop)}</b><div class="zacht klein">${esc(t)} · ${(a.komen || []).length} mensen</div></div>
+    ${lijst(a.regels)}${lijst(a.uitgevoerd)}${(a.fouten || []).map(f => `<div class="melding fout klein">${esc(f)}</div>`).join('')}
+    ${!uitgevoerd && a.ok && !gelijk ? '<div class="melding let klein">Je hebt de lijst met wie komt aangepast. Maak eerst een nieuw voorstel.</div>' : ''}
+    ${!uitgevoerd && a.ok ? `<button class="g" id="aanpassing-uitvoeren" style="width:100%;margin-top:8px" ${bezig || !gelijk ? 'disabled' : ''}>Uitvoeren: de boekingen aanpassen</button>` : ''}`;
+}
+function komtBlok() {
+  const datum = volgendeWoensdag();
+  if (!S.komen) S.komen = standaardKomen(datum);
+  const rijen = S.lijst.map(p => `<label class="chip" style="display:flex;margin:6px 0"><input type="checkbox" data-komt="${esc(p.naam)}" ${S.komen.has(p.naam) ? 'checked' : ''}> ${esc(p.naam)}</label>`).join('');
+  return `<div class="kaart"><h2>Wie komt er? ${esc(nlDatum(datum))}</h2><p class="zacht klein" style="margin:0 0 6px">Vink aan wie er komt volgens de poll. Daarna maak je een voorstel. Er verandert pas iets bij de golfclub als je daarna op Uitvoeren tikt.</p>
+    ${rijen}<div class="zacht klein" style="margin:6px 0"><span id="komt-aantal">${S.komen.size}</span> mensen komen</div>
+    <button class="p" id="voorstel-maken" style="width:100%" ${S.bezig ? 'disabled' : ''}>Voorstel maken</button>${S.bezig ? `<div class="melding let voortgang">${esc(S.bezig)}</div>` : ''}
+    <div id="aanpassing-uitkomst" style="margin-top:10px">${aanpassingBlok(datum)}</div></div>`;
 }
 function woensdagScherm() {
   const w = S.data.woensdag?.json;
@@ -135,6 +164,7 @@ function woensdagScherm() {
   const rijen = S.lijst.map((p, i) => `<div class="naamrij"><span class="nr">${i + 1}</span><input type="text" data-naam="${i}" value="${esc(p.naam)}" aria-label="Naam ${i + 1}" autocapitalize="words"><span class="rij"><button class="klein-knop" data-op="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Omhoog">↑</button><button class="klein-knop" data-neer="${i}" ${i === S.lijst.length - 1 ? 'disabled' : ''} aria-label="Omlaag">↓</button></span><span class="opties"><label class="chip"><input type="checkbox" data-gast="${i}" ${p.gast ? 'checked' : ''}> Geen lid (gast)</label><label class="chip"><input type="radio" name="eigenaar" data-eigenaar="${i}" ${p.eigenaar ? 'checked' : ''}> Ik</label><button class="klein-knop" data-weg="${i}" aria-label="Verwijderen">✕</button></span></div>`).join('');
   return `<div class="kaart">${schakel('aan-w', w.aan === true, 'Automatisch boeken', w.aan ? 'Staat aan: drie keer per dag wordt gekeken of er een woensdag aan de beurt is.' : 'Staat uit: er wordt niets geboekt.')}</div>
   <div class="kaart"><h2>Handmatig</h2>${knoppenBlok('w')}<div style="margin-top:10px">${proefBlok(S.data.proefW)}</div></div>
+  ${komtBlok()}
   <div class="kaart"><h2>Rooster komende weken</h2><p class="zacht klein" style="margin:0 0 4px">Zo loopt het als iedereen kan inloggen. Wie geen inlog heeft, kan alleen medespeler zijn.</p><ul class="lijst">${plan}</ul></div>
   <div class="kaart"><h2>Stand</h2>${stand || '<p class="zacht klein">Nog niets geboekt.</p>'}</div>
   <div class="kaart"><h2>Namen (${S.lijst.length})</h2><p class="zacht klein" style="margin:0 0 6px">De volgorde bepaalt het rooster: elke week schuiven de hoofdboekers drie plekken op. Schrijf de naam zoals bij de golfclub.</p>${rijen}<div class="rij" style="margin-top:12px"><button class="vol" id="naam-erbij">+ Naam erbij</button><button class="vol p" id="namen-opslaan" ${S.wijz.lijst ? '' : 'disabled'}>Opslaan</button></div><div id="meld-namen"></div></div>
@@ -189,26 +219,47 @@ async function opslaanJson(sleutel, aanpassen, bericht) {
 const getal = (id, min, max, naam) => { const v = Number($(id).value); if (!Number.isInteger(v) || v < min || v > max) throw new Error(`${naam} moet een getal van ${min} tot ${max} zijn.`); return v; };
 const tijdOk = t => /^\d{2}:\d{2}$/.test(t) && +t.slice(0, 2) >= 6 && +t.slice(0, 2) <= 20 && +t.slice(3) < 60;
 
+/** Een taak op GitHub starten en wachten tot hij klaar is. Geeft de afgeronde run terug. */
+async function werk(bestand, inputs) {
+  const t0 = Date.now() - 60000;
+  S.bezig = 'Opdracht versturen…'; melding(null); render();
+  await gh(`/repos/${REPO}/actions/workflows/${bestand}/dispatches`, { method: 'POST', body: { ref: 'main', ...(inputs ? { inputs } : {}) } });
+  let run = null;
+  for (let i = 0; i < 90 && !(run?.status === 'completed'); i++) {
+    await new Promise(r => setTimeout(r, window.__poll ?? 4000));
+    const j = await gh(`/repos/${REPO}/actions/workflows/${bestand}/runs?per_page=1&event=workflow_dispatch&t=${Date.now()}`);
+    const r = j?.workflow_runs?.[0];
+    if (r && Date.parse(r.created_at) >= t0) run = r;
+    S.bezig = run ? (run.status === 'completed' ? 'Klaar…' : 'Bezig… dit duurt ongeveer een halve minuut.') : 'Wachten tot GitHub begint…'; if ($('voortgang')) $('voortgang').textContent = S.bezig;
+  }
+  if (!run || run.status !== 'completed') throw new Error('Het duurt langer dan verwacht. Kijk later op deze pagina of bij Actions op GitHub.');
+  S.bezig = null;
+  const komen = S.komen; await laadAlles(); S.komen = komen;
+  return run;
+}
 async function start(soort, modus) {
   const bestand = soort === 'w' ? (modus === 'nu' ? 'woensdag-nu.yml' : 'woensdag-proef.yml') : (modus === 'nu' ? 'golf-nu.yml' : 'golf-proef.yml');
   if (modus === 'nu' && !confirm(`Weet je het zeker? Dit boekt nu echt starttijden bij de golfclub.`)) return;
-  const t0 = Date.now() - 60000;
-  S.bezig = 'Opdracht versturen…'; melding(null); render();
   try {
-    await gh(`/repos/${REPO}/actions/workflows/${bestand}/dispatches`, { method: 'POST', body: { ref: 'main' } });
-    let run = null;
-    for (let i = 0; i < 90 && !(run?.status === 'completed'); i++) {
-      await new Promise(r => setTimeout(r, window.__poll ?? 4000));
-      const j = await gh(`/repos/${REPO}/actions/workflows/${bestand}/runs?per_page=1&event=workflow_dispatch&t=${Date.now()}`);
-      const r = j?.workflow_runs?.[0];
-      if (r && Date.parse(r.created_at) >= t0) run = r;
-      S.bezig = run ? (run.status === 'completed' ? 'Klaar…' : 'Bezig met boeken… dit duurt ongeveer een halve minuut.') : 'Wachten tot GitHub begint…'; if ($('voortgang')) $('voortgang').textContent = S.bezig;
-    }
-    if (!run || run.status !== 'completed') throw new Error('Het duurt langer dan verwacht. Kijk later op deze pagina of bij Actions op GitHub.');
-    S.bezig = null;
-    await laadAlles();
+    const run = await werk(bestand);
     if (run.conclusion === 'success') melding('ok', modus === 'nu' ? 'Klaar: de run is geslaagd. Kijk in de stand hieronder en controleer in de golfapp.' : 'Proefrun klaar: het resultaat staat hieronder.');
     else melding(modus === 'proef' ? 'let' : 'fout', modus === 'proef' ? 'De proefrun is klaar, maar er staat iets op rood. Lees het resultaat hieronder.' : 'De run is niet helemaal gelukt. Kijk in de stand en in de melding op je telefoon.');
+  } catch (e) { S.bezig = null; alsFout(e); }
+  render();
+}
+async function aanpassing(modus) {
+  const datum = volgendeWoensdag(), komen = [...S.komen];
+  if (komen.length < 2) { melding('fout', 'Er moeten minstens twee mensen komen.'); return render(); }
+  const a = S.data.aanpassing;
+  if (modus === 'uitvoeren') {
+    if (!a?.ok || !a.hash) return;
+    if (!confirm(`Dit past de echte boekingen bij de golfclub aan:\n\n${(a.regels || []).join('\n')}\n\nWeet je het zeker?`)) return;
+  }
+  try {
+    await werk('woensdag-aanpassen.yml', { modus, komen: komen.join(';'), datum, plan: modus === 'uitvoeren' ? a.hash : '' });
+    const n = S.data.aanpassing;
+    if (!n || n.datum !== datum || n.modus !== modus) melding('fout', 'De uitkomst is nog niet te vinden. Ververs de pagina over een minuut.');
+    else melding(n.ok ? 'ok' : 'let', n.ok ? (modus === 'voorstel' ? 'Het voorstel staat hieronder. Lees het goed en tik dan op Uitvoeren.' : 'Klaar: de boekingen zijn aangepast. Controleer ze in de golfapp.') : 'Het is niet gelukt. Lees hieronder wat er aan de hand is.');
   } catch (e) { S.bezig = null; alsFout(e); }
   render();
 }
@@ -224,6 +275,9 @@ function koppel() {
   };
   if ($('sleutel-weg')) $('sleutel-weg').onclick = () => { if (!confirm('De sleutel van deze telefoon verwijderen?')) return; S.token = ''; S.data = {}; bewaarZet('golf_sleutel', null); melding('ok', 'De sleutel is verwijderd.'); render(); };
   for (const soort of ['w', 'z']) { if ($('proef-' + soort)) $('proef-' + soort).onclick = () => start(soort, 'proef'); if ($('nu-' + soort)) $('nu-' + soort).onclick = () => start(soort, 'nu'); }
+  document.querySelectorAll('[data-komt]').forEach(el => el.onchange = () => { el.checked ? S.komen.add(el.dataset.komt) : S.komen.delete(el.dataset.komt); render(); });
+  if ($('voorstel-maken')) $('voorstel-maken').onclick = () => aanpassing('voorstel');
+  if ($('aanpassing-uitvoeren')) $('aanpassing-uitvoeren').onclick = () => aanpassing('uitvoeren');
   const aanSchakel = (id, sleutel, tekst) => { const el = $(id); if (!el) return; el.onclick = async () => {
     const nu = !(S.data[sleutel].json.aan === true);
     if (nu && !confirm(`${tekst} aanzetten? Vanaf dan wordt er vanzelf geboekt.`)) return;
