@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Golf boeken</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Golf">
+<meta name="theme-color" content="#1b5e20">
+<style>
+:root{--bg:#f3f5f2;--kaart:#fff;--tekst:#1c231d;--zacht:#5f6b61;--rand:#dde3dc;--groen:#1b5e20;--groen2:#e3f1e4;--rood:#b3261e;--rood2:#fbe9e7;--oranje:#9a5b00;--oranje2:#fff3e0;--knop:#1b5e20;--knoptekst:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#121613;--kaart:#1c231d;--tekst:#e9efe9;--zacht:#9aa79c;--rand:#2c372d;--groen:#7bd27f;--groen2:#1d3a20;--rood:#ff8a80;--rood2:#3b1e1b;--oranje:#ffb74d;--oranje2:#3a2c12;--knop:#2e7d32;--knoptekst:#fff}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tekst);font:16px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+main{padding:14px 16px calc(84px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
+h1{font-size:22px;margin:6px 0 2px}h2{font-size:17px;margin:0 0 8px}
+.zacht{color:var(--zacht);font-size:14px}.klein{font-size:13px}
+.kaart{background:var(--kaart);border:1px solid var(--rand);border-radius:14px;padding:14px;margin:12px 0}
+button,.knop{font:inherit;min-height:46px;padding:10px 16px;border-radius:12px;border:1px solid var(--rand);background:var(--kaart);color:var(--tekst);cursor:pointer}
+button.p{background:var(--knop);color:var(--knoptekst);border-color:transparent;font-weight:600}
+button.g{background:var(--rood);color:#fff;border-color:transparent;font-weight:600}
+button:disabled{opacity:.45}
+.rij{display:flex;gap:8px;align-items:center}.rij>*{min-width:0}.vol{flex:1}
+.kolom{display:flex;flex-direction:column;gap:10px}
+label.veld{display:block;font-size:14px;color:var(--zacht)}
+label.veld input,label.veld select{display:block;width:100%;margin-top:4px;font:inherit;min-height:46px;padding:8px 12px;border-radius:10px;border:1px solid var(--rand);background:var(--bg);color:var(--tekst)}
+.schakel{display:flex;align-items:center;gap:12px;justify-content:space-between}
+.schakel b{font-size:17px}
+.sw{position:relative;width:58px;height:34px;flex:none;padding:0;border-radius:17px;background:var(--rand);border:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:28px;height:28px;border-radius:50%;background:#fff;transition:left .15s}
+.sw[aria-checked=true]{background:var(--knop)}.sw[aria-checked=true]::after{left:27px}
+.melding{padding:10px 12px;border-radius:10px;margin:10px 0;font-size:15px}
+.ok{background:var(--groen2);color:var(--groen)}.fout{background:var(--rood2);color:var(--rood)}.let{background:var(--oranje2);color:var(--oranje)}
+.lijst{margin:0;padding:0;list-style:none}.lijst li{padding:8px 0;border-bottom:1px solid var(--rand)}.lijst li:last-child{border-bottom:none}
+.naamrij{display:grid;grid-template-columns:26px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--rand)}
+.naamrij .nr{color:var(--zacht);text-align:right}
+.naamrij input[type=text]{width:100%;font:inherit;min-height:44px;padding:6px 10px;border-radius:10px;border:1px solid var(--rand);background:var(--bg);color:var(--tekst)}
+.naamrij .opties{grid-column:2/4;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.klein-knop{min-height:40px;min-width:40px;padding:4px 10px;font-size:15px}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:4px 12px;border-radius:20px;border:1px solid var(--rand);font-size:14px;background:var(--bg)}
+.chip input{width:20px;height:20px}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--kaart);border-top:1px solid var(--rand);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:none;border-radius:0;background:none;min-height:58px;font-size:13px;color:var(--zacht)}
+nav button[aria-current=true]{color:var(--groen);font-weight:700}
+nav button span{display:block;font-size:22px;line-height:1.1}
+.stap{padding-left:18px}.stap li{margin:6px 0}
+code{background:var(--bg);padding:1px 6px;border-radius:6px;font-size:14px;word-break:break-all}
+.dag{margin:10px 0 2px;font-weight:600}
+.pil{display:inline-block;padding:1px 8px;border-radius:10px;font-size:13px;margin-right:4px}
+</style>
+</head>
+<body>
+<main id="app"><p class="zacht">Laden…</p></main>
+<nav id="menu" hidden></nav>
+<script>
+'use strict';
+/* Telefoonpagina voor de golfboeker. Praat rechtstreeks met de privé-repo op GitHub (instellingen lezen en bewaren, proefrun en boeken starten).
+   Er staat niets geheims in dit bestand: de GitHub-sleutel staat alleen op de telefoon van wie hem invult. */
+const REPO = 'kscdbgt5d6-cloud/Prive', API = 'https://api.github.com', TAAK = { w: 'woensdag', z: 'golf' };
+const BESTAND = { woensdag: 'golf/woensdag.json', zondag: 'golf/instellingen.json', statusW: 'golf/status-woensdag.json', statusZ: 'golf/status.json', proefW: 'golf/laatste-proef-woensdag.json', proefZ: 'golf/laatste-proef.json' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const bewaarLees = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const bewaarZet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* bewaren kan niet: dan blijft het bij deze sessie */ } };
+let S = { tab: bewaarLees('golf_tab') || 'woensdag', token: bewaarLees('golf_sleutel') || '', data: {}, melding: null, bezig: null, wijz: {} };
+
+// ---------- datums en rooster (zelfde regels als de boeker zelf) ----------
+const mod = (a, n) => ((a % n) + n) % n;
+const dagnr = d => { if (!/^\d{4}-\d{2}-\d{2}$/.test(d || '')) return null; const t = Date.parse(d + 'T00:00:00Z'); return Number.isNaN(t) ? null : t / 86400000; };
+const datumVan = n => new Date(n * 86400000).toISOString().slice(0, 10);
+const DAGEN = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'], MAANDEN = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
+const nlDatum = d => { const n = dagnr(d); return n === null ? String(d) : `${DAGEN[mod(n + 4, 7)]} ${Number(d.slice(8, 10))} ${MAANDEN[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}`; };
+const vandaagNl = () => window.__vandaag || new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Amsterdam' }).format(new Date());
+function roosterVoor(lijst, datum, start, aantal) { const n = lijst.length; if (!n) return []; const s = mod(aantal * Math.floor((dagnr(datum) - dagnr(start)) / 7), n); return [...lijst.slice(s), ...lijst.slice(0, s)]; }
+function planVoor(lijst, datum, start, aantal) {
+  const r = roosterVoor(lijst, datum, start, aantal), bookers = r.slice(0, aantal), verboden = new Set(bookers.map(b => b.naam.toLowerCase()));
+  return bookers.map(booker => { const partner = [...r].reverse().find(p => !verboden.has(p.naam.toLowerCase())); if (partner) verboden.add(partner.naam.toLowerCase()); return { booker, partner }; });
+}
+function komendeWoensdagen(vandaag, aantal) { const v = dagnr(vandaag), uit = []; for (let n = v; uit.length < aantal; n++) if (mod(n + 4, 7) === 3) uit.push(datumVan(n)); return uit; }
+
+// ---------- GitHub ----------
+class GhFout extends Error { constructor(status, tekst) { super(tekst); this.status = status; } }
+async function gh(pad, { method = 'GET', body } = {}) {
+  let r;
+  try { r = await fetch(API + pad, { method, cache: 'no-store', headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', Authorization: `Bearer ${S.token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined }); }
+  catch { throw new GhFout(0, 'Geen verbinding. Probeer het zo nog eens.'); }
+  if (r.status === 204) return null;
+  const j = await r.json().catch(() => null);
+  if (r.ok) return j;
+  const uitleg = { 401: 'De sleutel klopt niet of is verlopen. Maak een nieuwe (zie Sleutel).', 403: 'De sleutel heeft hier geen toestemming voor. Controleer bij het maken van de sleutel: Contents en Actions moeten op "Read and write" staan.', 404: 'Niet gevonden. Staat de sleutel op de repo Prive?', 409: 'Er is intussen iets veranderd. Ververs de pagina en probeer het opnieuw.', 422: 'GitHub wil dit zo niet: ' + (j?.message || '') }[r.status];
+  throw new GhFout(r.status, uitleg || `GitHub gaf een foutmelding (${r.status}).`);
+}
+const dec = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, '')), c => c.charCodeAt(0)));
+const enc = tekst => btoa(String.fromCharCode(...new TextEncoder().encode(tekst)));
+async function leesBestand(pad) {
+  try { const j = await gh(`/repos/${REPO}/contents/${pad}?ref=main&t=${Date.now()}`); return { tekst: dec(j.content), sha: j.sha }; }
+  catch (e) { if (e.status === 404) return null; throw e; }   // een bestand dat er nog niet is (bijvoorbeeld de eerste keer de proefrun)
+}
+async function leesJson(pad) { const f = await leesBestand(pad); if (!f) return null; try { return { json: JSON.parse(f.tekst), sha: f.sha }; } catch { return null; } }
+async function schrijfJson(pad, json, sha, bericht) { const j = await gh(`/repos/${REPO}/contents/${pad}`, { method: 'PUT', body: { message: bericht, content: enc(JSON.stringify(json, null, 2) + '\n'), sha, branch: 'main' } }); return j.content.sha; }
+
+async function laadAlles() {
+  await gh(`/repos/${REPO}`);   // eerst kijken of de sleutel werkt en bij de repo mag
+  const [w, z, sw, sz, pw, pz] = await Promise.all(['woensdag', 'zondag', 'statusW', 'statusZ', 'proefW', 'proefZ'].map(k => leesJson(BESTAND[k])));
+  S.data = { verbonden: true, woensdag: w, zondag: z, statusW: sw?.json || {}, statusZ: sz?.json || {}, proefW: pw?.json || null, proefZ: pz?.json || null };
+  S.wijz = {};
+  S.lijst = (w?.json?.lijst || []).map(p => ({ ...p }));
+}
+
+// ---------- weergave ----------
+const melding = (soort, tekst) => { S.melding = tekst ? { soort, tekst } : null; };
+/** Een melding vlak bij de knop (zonder de pagina opnieuw op te bouwen, zodat wat je intikte blijft staan) */
+const inline = (id, soort, tekst) => { const el = $(id); if (el) el.innerHTML = tekst ? `<div class="melding ${soort}" role="status">${esc(tekst)}</div>` : ''; };
+function schakel(id, aan, tekst, hulp) { return `<div class="schakel"><div><b>${esc(tekst)}</b>${hulp ? `<div class="zacht klein">${esc(hulp)}</div>` : ''}</div><button class="sw" id="${id}" role="switch" aria-checked="${aan ? 'true' : 'false'}" aria-label="${esc(tekst)}"></button></div>`; }
+const STATUS = { geboekt: ['✅', 'ok'], bestaat: ['✅ had al een boeking', 'ok'], wacht: ['⏳', 'let'], bezig: ['⏳', 'let'], onzeker: ['⚠️ kijk zelf in de golfapp', 'fout'] };
+function proefBlok(p) {
+  if (!p) return '<p class="zacht klein">Nog geen proefrun gedaan.</p>';
+  const t = new Intl.DateTimeFormat('nl-NL', { timeZone: 'Europe/Amsterdam', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(p.tijd));
+  const regels = (p.regels || []).map(r => `<li>${esc(r)}</li>`).join(''), rooster = (p.rooster || []).map(r => `<li>${esc(r)}</li>`).join('');
+  return `<div class="melding ${p.ok ? 'ok' : 'fout'}"><b>${esc(p.tekst)}</b><div class="zacht klein">Laatste proefrun: ${esc(t)}</div></div><ul class="lijst klein">${regels}</ul>${rooster ? `<div class="dag">Rooster (als niemand wordt overgeslagen)</div><ul class="lijst klein">${rooster}</ul>` : ''}`;
+}
+function knoppenBlok(soort) {
+  const bezig = S.bezig;
+  return `<div class="rij"><button class="vol" id="proef-${soort}" ${bezig ? 'disabled' : ''}>🔍 Proefrun<br><span class="klein zacht">boekt niets</span></button><button class="vol p" id="nu-${soort}" ${bezig ? 'disabled' : ''}>Nu boeken<br><span class="klein">echt boeken</span></button></div>${bezig ? `<div class="melding let" id="voortgang">${esc(bezig)}</div>` : ''}`;
+}
+function woensdagScherm() {
+  const w = S.data.woensdag?.json;
+  if (!w) return '<div class="melding fout">woensdag.json is niet gevonden in de repo.</div>';
+  const st = S.data.statusW || {}, datums = [...new Set(Object.keys(st).map(k => k.split('|')[0]))].sort().reverse().slice(0, 4);
+  const plan = komendeWoensdagen(vandaagNl(), 4).map(d => `<li><b>${esc(nlDatum(d))}</b><br>${planVoor(S.lijst.map(p => ({ naam: p.naam })), d, w.rotatie_start || w.eerste_woensdag || '2027-03-31', w.aantal_tijden || 3).map(x => `${esc(x.booker.naam)} met ${esc(x.partner?.naam ?? '?')}`).join(' · ')}</li>`).join('');
+  const stand = datums.map(d => `<div class="dag">${esc(nlDatum(d))}</div><ul class="lijst klein">${Object.entries(st).filter(([k]) => k.startsWith(d + '|') && !k.endsWith('|#')).map(([k, e]) => { const [tekst, kleur] = STATUS[e.status] || [e.status, 'let']; return `<li><span class="pil ${kleur}">${esc(tekst)}</span>${esc(k.split('|')[1])}${e.tijd ? ` om ${esc(e.tijd)}` : ''}${e.maat ? ` met ${esc(e.maat)}` : ''}${e.status === 'wacht' && e.melding ? `<div class="zacht">${esc(e.melding)}</div>` : ''}</li>`; }).join('')}</ul>`).join('');
+  const rijen = S.lijst.map((p, i) => `<div class="naamrij"><span class="nr">${i + 1}</span><input type="text" data-naam="${i}" value="${esc(p.naam)}" aria-label="Naam ${i + 1}" autocapitalize="words"><span class="rij"><button class="klein-knop" data-op="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Omhoog">↑</button><button class="klein-knop" data-neer="${i}" ${i === S.lijst.length - 1 ? 'disabled' : ''} aria-label="Omlaag">↓</button></span><span class="opties"><label class="chip"><input type="checkbox" data-gast="${i}" ${p.gast ? 'checked' : ''}> Geen lid (gast)</label><label class="chip"><input type="radio" name="eigenaar" data-eigenaar="${i}" ${p.eigenaar ? 'checked' : ''}> Ik</label><button class="klein-knop" data-weg="${i}" aria-label="Verwijderen">✕</button></span></div>`).join('');
+  return `<div class="kaart">${schakel('aan-w', w.aan === true, 'Automatisch boeken', w.aan ? 'Staat aan: drie keer per dag wordt gekeken of er een woensdag aan de beurt is.' : 'Staat uit: er wordt niets geboekt.')}</div>
+  <div class="kaart"><h2>Handmatig</h2>${knoppenBlok('w')}<div style="margin-top:10px">${proefBlok(S.data.proefW)}</div></div>
+  <div class="kaart"><h2>Rooster komende weken</h2><p class="zacht klein" style="margin:0 0 4px">Zo loopt het als iedereen kan inloggen. Wie geen inlog heeft, kan alleen medespeler zijn.</p><ul class="lijst">${plan}</ul></div>
+  <div class="kaart"><h2>Stand</h2>${stand || '<p class="zacht klein">Nog niets geboekt.</p>'}</div>
+  <div class="kaart"><h2>Namen (${S.lijst.length})</h2><p class="zacht klein" style="margin:0 0 6px">De volgorde bepaalt het rooster: elke week schuiven de hoofdboekers drie plekken op. Schrijf de naam zoals bij de golfclub.</p>${rijen}<div class="rij" style="margin-top:12px"><button class="vol" id="naam-erbij">+ Naam erbij</button><button class="vol p" id="namen-opslaan" ${S.wijz.lijst ? '' : 'disabled'}>Opslaan</button></div><div id="meld-namen"></div></div>
+  <div class="kaart"><h2>Instellingen</h2><div class="kolom">
+    <label class="veld">Eerste starttijd vanaf<input id="w-tijd" value="${esc(w.tijd_vanaf ?? '19:15')}" inputmode="numeric"></label>
+    <label class="veld">Aantal tijden<input id="w-aantal" type="number" min="1" max="10" value="${esc(w.aantal_tijden ?? 3)}"></label>
+    <label class="veld">Dagen van tevoren boeken<input id="w-dagen" type="number" min="1" max="28" value="${esc(w.dagen_van_tevoren ?? 14)}"></label>
+    <label class="veld">Maximum aantal boekingen per persoon<input id="w-max" type="number" min="1" max="10" value="${esc(w.max_boekingen ?? 3)}"></label>
+    <button class="p" id="w-opslaan">Instellingen opslaan</button><div id="meld-w"></div></div></div>`;
+}
+function zondagScherm() {
+  const z = S.data.zondag?.json;
+  if (!z) return '<div class="melding fout">instellingen.json is niet gevonden in de repo.</div>';
+  const st = S.data.statusZ || {}, rij = Object.entries(st).sort().reverse().slice(0, 5).map(([d, e]) => { const [tekst, kleur] = STATUS[e.status] || [e.status, 'let']; return `<li><span class="pil ${kleur}">${esc(tekst)}</span><b>${esc(nlDatum(d))}</b>${e.tijd ? ` om ${esc(e.tijd)}` : ''}${e.lus ? `, lus ${esc(e.lus)}` : ''}${e.melding ? `<div class="zacht">${esc(e.melding)}</div>` : ''}</li>`; }).join('');
+  return `<div class="kaart">${schakel('aan-z', z.aan === true, 'Automatisch boeken', z.aan ? 'Staat aan.' : 'Staat uit: er wordt niets geboekt.')}</div>
+  <div class="kaart"><h2>Handmatig</h2>${knoppenBlok('z')}<div style="margin-top:10px">${proefBlok(S.data.proefZ)}</div></div>
+  <div class="kaart"><h2>Stand</h2><ul class="lijst klein">${rij || '<li class="zacht">Nog niets geboekt.</li>'}</ul></div>
+  <div class="kaart"><h2>Instellingen</h2><div class="kolom">
+    <label class="veld">Starttijd<input id="z-tijd" value="${esc(z.tijd ?? '08:12')}" inputmode="numeric"></label>
+    <label class="veld">Medespeler<input id="z-maat" value="${esc(z.medespeler ?? '')}" autocapitalize="words"></label>
+    <label class="chip"><input type="checkbox" id="z-gast" ${z.medespeler_is_gast ? 'checked' : ''}> Medespeler is geen lid (gast)</label>
+    <label class="veld">Eerste zondag<input id="z-eerste" type="date" value="${esc(z.eerste_zondag ?? '')}"></label>
+    <label class="veld">Lus op die eerste zondag<select id="z-lus">${['A', 'B', 'C'].map(l => `<option ${z.lus_op_eerste_zondag === l ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label class="veld">Dagen van tevoren boeken<input id="z-dagen" type="number" min="1" max="28" value="${esc(z.dagen_van_tevoren ?? 7)}"></label>
+    <button class="p" id="z-opslaan">Instellingen opslaan</button><div id="meld-z"></div></div></div>`;
+}
+function sleutelScherm() {
+  return `<div class="kaart"><h2>GitHub-sleutel</h2>${S.token ? `<p>De sleutel staat op deze telefoon. Hij gaat alleen naar GitHub, nergens anders heen.</p><button class="g" id="sleutel-weg">Sleutel van deze telefoon verwijderen</button>` : stappen()}</div>
+  <div class="kaart"><h2>Hoe werkt dit?</h2><p class="klein zacht">Deze pagina laat GitHub het werk doen: de boekingen draaien daar, in je eigen privé-repo. De pagina leest en bewaart je instellingen en start proefruns of boekingen. Inlogs van mensen zet je niet hier maar bij GitHub onder Settings → Secrets (zie de uitleg in de repo).</p></div>`;
+}
+const stappen = () => `<p>Om je instellingen te kunnen bekijken en veranderen heeft deze pagina een eigen sleutel van GitHub nodig. Eenmalig:</p><ol class="stap"><li>Open in Safari <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a> en log in.</li><li>Naam: <code>Golf pagina</code>. Verloopt: kies <b>1 jaar</b>.</li><li>Bij <b>Repository access</b>: kies <b>Only select repositories</b> en dan <b>Prive</b>.</li><li>Bij <b>Repository permissions</b>: zet <b>Contents</b> en <b>Actions</b> allebei op <b>Read and write</b>.</li><li>Tik op <b>Generate token</b>, kopieer de sleutel en plak hem hieronder.</li></ol><label class="veld">Sleutel<input id="sleutel-in" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…"></label><div style="margin-top:10px"><button class="p" id="sleutel-ok" style="width:100%">Opslaan en kijken</button></div>`;
+
+function render() {
+  const app = $('app'), menu = $('menu');
+  const kop = '<h1>⛳ Golf boeken</h1>';
+  const m = S.melding ? `<div class="melding ${S.melding.soort}" role="status">${esc(S.melding.tekst)}</div>` : '';
+  if (!S.token || S.tab === 'sleutel') { menu.hidden = !S.token; app.innerHTML = kop + m + sleutelScherm(); }
+  else if (!S.data.verbonden) { menu.hidden = false; app.innerHTML = kop + m + '<p class="zacht">Laden…</p>'; }
+  else { menu.hidden = false; app.innerHTML = kop + m + (S.tab === 'zondag' ? zondagScherm() : woensdagScherm()); }
+  menu.innerHTML = [['woensdag', '🌙', 'Woensdag'], ['zondag', '☀️', 'Zondag'], ['sleutel', '🔑', 'Sleutel']].map(([k, i, t]) => `<button data-tab="${k}" aria-current="${S.tab === k}"><span>${i}</span>${t}</button>`).join('');
+  koppel();
+}
+
+// ---------- gedrag ----------
+const alsFout = e => melding('fout', e instanceof GhFout ? e.message : `Er ging iets mis: ${e?.message || e}`);
+async function opslaanJson(sleutel, aanpassen, bericht) {
+  const f = S.data[sleutel]; if (!f) return { ok: false, fout: 'Het bestand is niet geladen.' };
+  const nieuw = JSON.parse(JSON.stringify(f.json)); aanpassen(nieuw);
+  try { const sha = await schrijfJson(BESTAND[sleutel], nieuw, f.sha, bericht); S.data[sleutel] = { json: nieuw, sha }; return { ok: true }; }
+  catch (e) { return { ok: false, fout: e instanceof GhFout ? e.message : `Er ging iets mis: ${e?.message || e}` }; }
+}
+const getal = (id, min, max, naam) => { const v = Number($(id).value); if (!Number.isInteger(v) || v < min || v > max) throw new Error(`${naam} moet een getal van ${min} tot ${max} zijn.`); return v; };
+const tijdOk = t => /^\d{2}:\d{2}$/.test(t) && +t.slice(0, 2) >= 6 && +t.slice(0, 2) <= 20 && +t.slice(3) < 60;
+
+async function start(soort, modus) {
+  const bestand = soort === 'w' ? (modus === 'nu' ? 'woensdag-nu.yml' : 'woensdag-proef.yml') : (modus === 'nu' ? 'golf-nu.yml' : 'golf-proef.yml');
+  if (modus === 'nu' && !confirm(`Weet je het zeker? Dit boekt nu echt starttijden bij de golfclub.`)) return;
+  const t0 = Date.now() - 60000;
+  S.bezig = 'Opdracht versturen…'; melding(null); render();
+  try {
+    await gh(`/repos/${REPO}/actions/workflows/${bestand}/dispatches`, { method: 'POST', body: { ref: 'main' } });
+    let run = null;
+    for (let i = 0; i < 90 && !(run?.status === 'completed'); i++) {
+      await new Promise(r => setTimeout(r, window.__poll ?? 4000));
+      const j = await gh(`/repos/${REPO}/actions/workflows/${bestand}/runs?per_page=1&event=workflow_dispatch&t=${Date.now()}`);
+      const r = j?.workflow_runs?.[0];
+      if (r && Date.parse(r.created_at) >= t0) run = r;
+      S.bezig = run ? (run.status === 'completed' ? 'Klaar…' : 'Bezig met boeken… dit duurt ongeveer een halve minuut.') : 'Wachten tot GitHub begint…'; if ($('voortgang')) $('voortgang').textContent = S.bezig;
+    }
+    if (!run || run.status !== 'completed') throw new Error('Het duurt langer dan verwacht. Kijk later op deze pagina of bij Actions op GitHub.');
+    S.bezig = null;
+    await laadAlles();
+    if (run.conclusion === 'success') melding('ok', modus === 'nu' ? 'Klaar: de run is geslaagd. Kijk in de stand hieronder en controleer in de golfapp.' : 'Proefrun klaar: het resultaat staat hieronder.');
+    else melding(modus === 'proef' ? 'let' : 'fout', modus === 'proef' ? 'De proefrun is klaar, maar er staat iets op rood. Lees het resultaat hieronder.' : 'De run is niet helemaal gelukt. Kijk in de stand en in de melding op je telefoon.');
+  } catch (e) { S.bezig = null; alsFout(e); }
+  render();
+}
+
+function koppel() {
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S.tab = b.dataset.tab; if (S.tab !== 'sleutel') bewaarZet('golf_tab', S.tab); melding(null); render(); });
+  if ($('sleutel-ok')) $('sleutel-ok').onclick = async () => {
+    const t = $('sleutel-in').value.trim(); if (!t) return;
+    S.token = t; S.data = {}; melding(null); render();
+    try { await gh(`/repos/${REPO}`); bewaarZet('golf_sleutel', t); S.tab = bewaarLees('golf_tab') || 'woensdag'; await laadAlles(); }
+    catch (e) { S.token = ''; bewaarZet('golf_sleutel', null); alsFout(e); }
+    render();
+  };
+  if ($('sleutel-weg')) $('sleutel-weg').onclick = () => { if (!confirm('De sleutel van deze telefoon verwijderen?')) return; S.token = ''; S.data = {}; bewaarZet('golf_sleutel', null); melding('ok', 'De sleutel is verwijderd.'); render(); };
+  for (const soort of ['w', 'z']) { if ($('proef-' + soort)) $('proef-' + soort).onclick = () => start(soort, 'proef'); if ($('nu-' + soort)) $('nu-' + soort).onclick = () => start(soort, 'nu'); }
+  const aanSchakel = (id, sleutel, tekst) => { const el = $(id); if (!el) return; el.onclick = async () => {
+    const nu = !(S.data[sleutel].json.aan === true);
+    if (nu && !confirm(`${tekst} aanzetten? Vanaf dan wordt er vanzelf geboekt.`)) return;
+    const r = await opslaanJson(sleutel, j => { j.aan = nu; }, `Golf: automatisch boeken ${nu ? 'aangezet' : 'uitgezet'} (telefoonpagina)`); melding(r.ok ? null : 'fout', r.fout); render(); }; };
+  aanSchakel('aan-w', 'woensdag', 'Woensdag boeken'); aanSchakel('aan-z', 'zondag', 'Zondag boeken');
+  // namen
+  const lijstWijzig = () => { S.wijz.lijst = true; if ($('namen-opslaan')) $('namen-opslaan').disabled = false; };
+  document.querySelectorAll('[data-naam]').forEach(el => el.oninput = () => { S.lijst[+el.dataset.naam].naam = el.value; lijstWijzig(); });
+  document.querySelectorAll('[data-gast]').forEach(el => el.onchange = () => { S.lijst[+el.dataset.gast].gast = el.checked; lijstWijzig(); });
+  document.querySelectorAll('[data-eigenaar]').forEach(el => el.onchange = () => { S.lijst.forEach((p, i) => { p.eigenaar = i === +el.dataset.eigenaar; }); lijstWijzig(); });
+  const verplaats = (i, j) => { [S.lijst[i], S.lijst[j]] = [S.lijst[j], S.lijst[i]]; lijstWijzig(); render(); };
+  document.querySelectorAll('[data-op]').forEach(el => el.onclick = () => verplaats(+el.dataset.op, +el.dataset.op - 1));
+  document.querySelectorAll('[data-neer]').forEach(el => el.onclick = () => verplaats(+el.dataset.neer, +el.dataset.neer + 1));
+  document.querySelectorAll('[data-weg]').forEach(el => el.onclick = () => { const p = S.lijst[+el.dataset.weg]; if (!confirm(`${p.naam || 'Deze naam'} uit de lijst halen?`)) return; S.lijst.splice(+el.dataset.weg, 1); lijstWijzig(); render(); });
+  if ($('naam-erbij')) $('naam-erbij').onclick = () => { S.lijst.push({ naam: '' }); lijstWijzig(); render(); const l = document.querySelectorAll('[data-naam]'); l[l.length - 1]?.focus(); };
+  if ($('namen-opslaan')) $('namen-opslaan').onclick = async () => {
+    const w = S.data.woensdag.json, namen = S.lijst.map(p => p.naam.trim());
+    const min = 2 * (w.aantal_tijden || 3), fout = t => inline('meld-namen', 'fout', t);
+    if (namen.some(n => !n)) return fout('Er staat een lege naam in de lijst.');
+    if (new Set(namen.map(n => n.toLowerCase())).size !== namen.length) return fout('Er staat een naam dubbel in de lijst.');
+    if (namen.length < min) return fout(`Er zijn minstens ${min} namen nodig (hoofdboekers en medespelers).`);
+    if (S.lijst.filter(p => p.eigenaar).length > 1) return fout('Maar één persoon mag "Ik" zijn.');
+    const oud = new Map((w.lijst || []).map(p => [p.naam, p]));
+    const nieuw = S.lijst.map((p, i) => { const o = oud.get(p.naam) || oud.get(namen[i]) || {}; const uit = { naam: namen[i] }; if (p.eigenaar) uit.eigenaar = true; if (p.gast) uit.gast = true; if (o.gast_gegevens) uit.gast_gegevens = o.gast_gegevens; return uit; });
+    const r = await opslaanJson('woensdag', j => { j.lijst = nieuw; }, 'Golf woensdag: namenlijst aangepast (telefoonpagina)');
+    if (!r.ok) return fout(r.fout);
+    S.lijst = nieuw.map(p => ({ ...p })); S.wijz = {}; melding(null); render(); inline('meld-namen', 'ok', 'Opgeslagen.');
+  };
+  if ($('w-opslaan')) $('w-opslaan').onclick = async () => {
+    try {
+      const tijd = $('w-tijd').value.trim(); if (!tijdOk(tijd)) throw new Error('De tijd moet uren:minuten zijn, bijvoorbeeld 19:15.');
+      const aantal = getal('w-aantal', 1, 10, 'Het aantal tijden'), dagen = getal('w-dagen', 1, 28, 'Het aantal dagen'), max = getal('w-max', 1, 10, 'Het maximum');
+      const r = await opslaanJson('woensdag', j => { Object.assign(j, { tijd_vanaf: tijd, aantal_tijden: aantal, dagen_van_tevoren: dagen, max_boekingen: max }); }, 'Golf woensdag: instellingen aangepast (telefoonpagina)');
+      inline('meld-w', r.ok ? 'ok' : 'fout', r.ok ? 'Opgeslagen.' : r.fout);
+    } catch (e) { inline('meld-w', 'fout', e.message); }
+  };
+  if ($('z-opslaan')) $('z-opslaan').onclick = async () => {
+    try {
+      const tijd = $('z-tijd').value.trim(); if (!tijdOk(tijd)) throw new Error('De tijd moet uren:minuten zijn, bijvoorbeeld 08:12.');
+      const maat = $('z-maat').value.trim(); if (!maat) throw new Error('Vul de naam van je medespeler in.');
+      const eerste = $('z-eerste').value; const n = dagnr(eerste); if (n === null || mod(n + 4, 7) !== 0) throw new Error('De eerste zondag moet een zondag zijn.');
+      const dagen = getal('z-dagen', 1, 28, 'Het aantal dagen');
+      const r = await opslaanJson('zondag', j => { Object.assign(j, { tijd, medespeler: maat, medespeler_is_gast: $('z-gast').checked, eerste_zondag: eerste, lus_op_eerste_zondag: $('z-lus').value, dagen_van_tevoren: dagen }); }, 'Golf zondag: instellingen aangepast (telefoonpagina)');
+      inline('meld-z', r.ok ? 'ok' : 'fout', r.ok ? 'Opgeslagen.' : r.fout);
+    } catch (e) { inline('meld-z', 'fout', e.message); }
+  };
+}
+
+(async function begin() {
+  if (!S.token) return render();
+  render();
+  try { await laadAlles(); } catch (e) { alsFout(e); if (e.status === 401) { S.token = ''; bewaarZet('golf_sleutel', null); } }
+  render();
+})();
+</script>
+</body>
+</html>
