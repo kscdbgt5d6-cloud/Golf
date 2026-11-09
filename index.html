@@ -86,6 +86,13 @@ function standaardKomen(datum) {
   for (const [k, e] of Object.entries(st)) if (k.startsWith(datum + '|') && !k.endsWith('|#') && ['geboekt', 'bestaat', 'onzeker'].includes(e.status)) { uit.add(k.split('|')[1]); if (e.maat) uit.add(e.maat); }
   return uit;
 }
+const inSeizoen = (d, van, tot) => { const md = d.slice(5, 10); return van <= tot ? md >= van && md <= tot : md >= van || md <= tot; };
+const BAANNAAM = { par3: 'Par 3', gewoon: 'Gewone baan (alle drie de lussen)', overslaan: 'Niet boeken' };
+/** Welke baan hoort bij een woensdag: een uitzondering voor die datum wint; anders de winterbaan (31 okt t/m 31 mrt) of de zomerbaan */
+function baanVoor(w, d) {
+  const eigen = (w.baan_per_datum || {})[d], auto = inSeizoen(d, w.winter?.van ?? '10-31', w.winter?.tot ?? '03-31') ? (w.baan_winter ?? 'par3') : (w.baan_zomer ?? 'gewoon');
+  return { baan: BAANNAAM[eigen] ? eigen : auto, auto, uitzondering: !!BAANNAAM[eigen] };
+}
 function komendeWoensdagen(vandaag, aantal) { const v = dagnr(vandaag), uit = []; for (let n = v; uit.length < aantal; n++) if (mod(n + 4, 7) === 3) uit.push(datumVan(n)); return uit; }
 
 // ---------- GitHub ----------
@@ -159,17 +166,21 @@ function woensdagScherm() {
   const w = S.data.woensdag?.json;
   if (!w) return '<div class="melding fout">woensdag.json is niet gevonden in de repo.</div>';
   const st = S.data.statusW || {}, datums = [...new Set(Object.keys(st).map(k => k.split('|')[0]))].sort().reverse().slice(0, 4);
-  const plan = komendeWoensdagen(vandaagNl(), 4).map(d => `<li><b>${esc(nlDatum(d))}</b><br>${planVoor(S.lijst.map(p => ({ naam: p.naam })), d, w.rotatie_start || w.eerste_woensdag || '2027-03-31', w.aantal_tijden || 3).map(x => `${esc(x.booker.naam)} met ${esc(x.partner?.naam ?? '?')}`).join(' · ')}</li>`).join('');
+  const geboektOp = d => Object.keys(st).some(k => k.startsWith(d + '|') && !k.endsWith('|#'));
+  const plan = komendeWoensdagen(vandaagNl(), 4).map(d => { const b = baanVoor(w, d), vast = geboektOp(d);
+    return `<li><b>${esc(nlDatum(d))}</b><br>${planVoor(S.lijst.map(p => ({ naam: p.naam })), d, w.rotatie_start || w.eerste_woensdag || '2027-03-31', w.aantal_tijden || 3).map(x => `${esc(x.booker.naam)} met ${esc(x.partner?.naam ?? '?')}`).join(' · ')}
+      <label class="veld" style="margin-top:6px">Baan${vast ? ' (al geboekt, niet meer te veranderen)' : ''}<select data-baan="${esc(d)}" ${vast || S.bezig ? 'disabled' : ''}><option value="auto" ${b.uitzondering ? '' : 'selected'}>Automatisch: ${esc(BAANNAAM[b.auto])}</option>${['par3', 'gewoon', 'overslaan'].map(k => `<option value="${k}" ${b.uitzondering && b.baan === k ? 'selected' : ''}>${esc(BAANNAAM[k])}</option>`).join('')}</select></label></li>`; }).join('');
   const stand = datums.map(d => `<div class="dag">${esc(nlDatum(d))}</div><ul class="lijst klein">${Object.entries(st).filter(([k]) => k.startsWith(d + '|') && !k.endsWith('|#')).map(([k, e]) => { const [tekst, kleur] = STATUS[e.status] || [e.status, 'let']; return `<li><span class="pil ${kleur}">${esc(tekst)}</span>${esc(k.split('|')[1])}${e.tijd ? ` om ${esc(e.tijd)}` : ''}${e.maat ? ` met ${esc(e.maat)}` : ''}${e.status === 'wacht' && e.melding ? `<div class="zacht">${esc(e.melding)}</div>` : ''}</li>`; }).join('')}</ul>`).join('');
   const rijen = S.lijst.map((p, i) => `<div class="naamrij"><span class="nr">${i + 1}</span><input type="text" data-naam="${i}" value="${esc(p.naam)}" aria-label="Naam ${i + 1}" autocapitalize="words"><span class="rij"><button class="klein-knop" data-op="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Omhoog">↑</button><button class="klein-knop" data-neer="${i}" ${i === S.lijst.length - 1 ? 'disabled' : ''} aria-label="Omlaag">↓</button></span><span class="opties"><label class="chip"><input type="checkbox" data-gast="${i}" ${p.gast ? 'checked' : ''}> Geen lid (gast)</label><label class="chip"><input type="radio" name="eigenaar" data-eigenaar="${i}" ${p.eigenaar ? 'checked' : ''}> Ik</label><button class="klein-knop" data-weg="${i}" aria-label="Verwijderen">✕</button></span></div>`).join('');
   return `<div class="kaart">${schakel('aan-w', w.aan === true, 'Automatisch boeken', w.aan ? 'Staat aan: drie keer per dag wordt gekeken of er een woensdag aan de beurt is.' : 'Staat uit: er wordt niets geboekt.')}</div>
   <div class="kaart"><h2>Handmatig</h2>${knoppenBlok('w')}<div style="margin-top:10px">${proefBlok(S.data.proefW)}</div></div>
   ${komtBlok()}
-  <div class="kaart"><h2>Rooster komende weken</h2><p class="zacht klein" style="margin:0 0 4px">Zo loopt het als iedereen kan inloggen. Wie geen inlog heeft, kan alleen medespeler zijn.</p><ul class="lijst">${plan}</ul></div>
+  <div class="kaart"><h2>Rooster komende weken</h2><p class="zacht klein" style="margin:0 0 4px">Zo loopt het als iedereen kan inloggen. Wie geen inlog heeft, kan alleen medespeler zijn. De baan kun je hier per week aanpassen, zolang er nog niet geboekt is. Er wordt ${esc(w.dagen_van_tevoren ?? 14)} dagen van tevoren geboekt, dus pas het ruim op tijd aan.</p><ul class="lijst">${plan}</ul><div id="meld-rooster"></div></div>
   <div class="kaart"><h2>Stand</h2>${stand || '<p class="zacht klein">Nog niets geboekt.</p>'}</div>
   <div class="kaart"><h2>Namen (${S.lijst.length})</h2><p class="zacht klein" style="margin:0 0 6px">De volgorde bepaalt het rooster: elke week schuiven de hoofdboekers drie plekken op. Schrijf de naam zoals bij de golfclub.</p>${rijen}<div class="rij" style="margin-top:12px"><button class="vol" id="naam-erbij">+ Naam erbij</button><button class="vol p" id="namen-opslaan" ${S.wijz.lijst ? '' : 'disabled'}>Opslaan</button></div><div id="meld-namen"></div></div>
   <div class="kaart"><h2>Instellingen</h2><div class="kolom">
-    <label class="veld">Eerste starttijd vanaf<input id="w-tijd" value="${esc(w.tijd_vanaf ?? '19:15')}" inputmode="numeric"></label>
+    <label class="veld">Starttijd op de par 3 (winter): eerste tijd, de rest volgt achter elkaar<input id="w-tijd" value="${esc(w.tijd_vanaf ?? '19:15')}" inputmode="numeric"></label>
+    <label class="veld">Starttijd op de gewone baan (zomer): alle drie de lussen op dezelfde tijd<input id="w-zomer" value="${esc(w.tijd_zomer ?? w.tijd_vanaf ?? '19:15')}" inputmode="numeric"></label>
     <label class="veld">Aantal tijden<input id="w-aantal" type="number" min="1" max="10" value="${esc(w.aantal_tijden ?? 3)}"></label>
     <label class="veld">Dagen van tevoren boeken<input id="w-dagen" type="number" min="1" max="28" value="${esc(w.dagen_van_tevoren ?? 14)}"></label>
     <label class="veld">Maximum aantal boekingen per persoon<input id="w-max" type="number" min="1" max="10" value="${esc(w.max_boekingen ?? 3)}"></label>
@@ -306,11 +317,20 @@ function koppel() {
     if (!r.ok) return fout(r.fout);
     S.lijst = nieuw.map(p => ({ ...p })); S.wijz = {}; melding(null); render(); inline('meld-namen', 'ok', 'Opgeslagen.');
   };
+  document.querySelectorAll('[data-baan]').forEach(el => el.onchange = async () => {
+    const d = el.dataset.baan, v = el.value, w = S.data.woensdag.json;
+    if (v === 'gewoon' && (w.aantal_tijden || 3) > 3) { render(); return inline('meld-rooster', 'fout', 'Op de gewone baan zijn er maar 3 lussen. Zet eerst het aantal tijden op 3 of lager.'); }
+    const r = await opslaanJson('woensdag', j => { j.baan_per_datum = j.baan_per_datum || {}; if (v === 'auto') delete j.baan_per_datum[d]; else j.baan_per_datum[d] = v; }, `Golf woensdag: baan voor ${d} aangepast (telefoonpagina)`);
+    render(); inline('meld-rooster', r.ok ? 'ok' : 'fout', r.ok ? `Opgeslagen: ${nlDatum(d)} wordt ${v === 'auto' ? 'automatisch' : BAANNAAM[v].toLowerCase()}.` : r.fout);
+  });
   if ($('w-opslaan')) $('w-opslaan').onclick = async () => {
     try {
-      const tijd = $('w-tijd').value.trim(); if (!tijdOk(tijd)) throw new Error('De tijd moet uren:minuten zijn, bijvoorbeeld 19:15.');
+      const tijd = $('w-tijd').value.trim(), zomer = $('w-zomer').value.trim();
+      if (!tijdOk(tijd) || !tijdOk(zomer)) throw new Error('De tijden moeten uren:minuten zijn, bijvoorbeeld 19:15.');
       const aantal = getal('w-aantal', 1, 10, 'Het aantal tijden'), dagen = getal('w-dagen', 1, 28, 'Het aantal dagen'), max = getal('w-max', 1, 10, 'Het maximum');
-      const r = await opslaanJson('woensdag', j => { Object.assign(j, { tijd_vanaf: tijd, aantal_tijden: aantal, dagen_van_tevoren: dagen, max_boekingen: max }); }, 'Golf woensdag: instellingen aangepast (telefoonpagina)');
+      const w0 = S.data.woensdag.json;
+      if (aantal > 3 && [w0.baan_winter ?? 'par3', w0.baan_zomer ?? 'gewoon', ...Object.values(w0.baan_per_datum || {})].includes('gewoon')) throw new Error('Op de gewone baan zijn er maar 3 lussen (elke hoofdboeker boekt een andere lus op dezelfde tijd), dus het aantal tijden mag niet hoger zijn dan 3.');
+      const r = await opslaanJson('woensdag', j => { Object.assign(j, { tijd_vanaf: tijd, tijd_zomer: zomer, aantal_tijden: aantal, dagen_van_tevoren: dagen, max_boekingen: max }); }, 'Golf woensdag: instellingen aangepast (telefoonpagina)');
       inline('meld-w', r.ok ? 'ok' : 'fout', r.ok ? 'Opgeslagen.' : r.fout);
     } catch (e) { inline('meld-w', 'fout', e.message); }
   };
