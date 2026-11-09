@@ -4,4 +4,4 @@ Een pagina voor op de telefoon om de golfboeker te bedienen: automatisch boeken 
 
 De pagina bevat niets geheims. Hij praat rechtstreeks met GitHub, met een sleutel die alleen op de telefoon van de gebruiker staat. Namen, inlogs en instellingen staan in een andere, privé-repo; ze staan hier niet.
 
-Openen op de telefoon: **https://kscdbgt5d6-cloud.github.io/golf/** (daarna in Safari: Deel → Zet op beginscherm).
+Openen op de telefoon: **https://kscdbgt5d6-cloud.github.io/Golf/** (daarna in Safari: Deel → Zet op beginscherm).
